@@ -1,0 +1,9 @@
+# Copy to .cr-track.yaml at your repo root and edit.
+profile: balanced        # chill | balanced | assertive
+# Your CR-Track dashboard host + /api/ingest. Token comes from the
+# CR_TRACK_INGEST_TOKEN env var (printed by `npm run db:seed`), never stored here.
+endpoint: http://localhost:3000/api/ingest
+categories_enabled: [security, correctness, performance, maintainability, testing, style, docs]
+min_severity_to_report: info
+guidelines_files: [CLAUDE.md, CONTRIBUTING.md]
+learnings_file: .cr-track/learnings.md
