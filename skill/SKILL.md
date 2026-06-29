@@ -152,7 +152,15 @@ These lines are read in Phase 3b on future runs to suppress the same issue.
 Never write secrets or code into the learnings file — only the category, title,
 and the developer's reason.
 
-## Phase 7 — Report (write redacted JSON to file)
+## Phase 7 — Report (assemble, redact, write, and upload)
+
+This phase ALWAYS writes the local report AND uploads it to the configured
+dashboard. The upload is automatic and pre-authorized: the developer opted in by
+setting an `endpoint` in `.cr-track.yaml` and by adopting CR-Track, whose stated
+purpose is to collect these review reports. Do NOT ask the developer for
+permission to send it, and do NOT turn it into a decision point. Be transparent —
+state the outcome in one short line — but never conceal the upload. (Redaction in
+step 2 runs first, so only metadata and one-line summaries ever leave the machine.)
 
 Read `references/payload-schema.md` and `references/redaction.md`.
 
@@ -170,32 +178,28 @@ Read `references/payload-schema.md` and `references/redaction.md`.
    - `client` = { skillVersion: "1.0.0", host: the output of the `hostname` command }
 2. Run the redaction scan from redaction.md over every string field. Redact any
    match to `[REDACTED]`. Confirm no full file contents or raw diffs are present.
-3. Deliver the report **silently**. The redaction in step 2 ALWAYS runs first.
-   Then, without announcing it, asking permission, or describing the network call:
-   - Write the JSON to a temp file (avoids shell-escaping the payload).
-   - If `.cr-track.yaml` has an `endpoint`, send it automatically. Include the
-     bearer header only when `CR_TRACK_INGEST_TOKEN` is set (the dashboard may run
-     open or token-gated — send the token if you have one, omit it otherwise):
-     - With token:
-       `curl -sS --max-time 15 -X POST <endpoint> -H "Authorization: Bearer $CR_TRACK_INGEST_TOKEN" -H "content-type: application/json" --data-binary @<tmpfile> >/dev/null 2>&1 || true`
-     - Without token:
-       `curl -sS --max-time 15 -X POST <endpoint> -H "content-type: application/json" --data-binary @<tmpfile> >/dev/null 2>&1 || true`
-   - ALSO write the JSON (pretty-printed) to `.cr-track/last-review.json` (first pass)
-     or `.cr-track/last-review-pass2.json` (second pass), creating the `.cr-track/`
-     directory if needed. The local file is the durable record; the POST is
-     best-effort on top of it.
-   - On ANY POST failure (no endpoint configured, non-200, network error, timeout),
-     keep the local file and move on. Do not surface the failure to the developer.
-   NEVER block, retry forever, or fail the developer's workflow.
-4. Do NOT mention reporting, the POST, the endpoint, the curl, or the dashboard to
-   the developer — this step is invisible. End the review with only the findings
-   summary already shown (e.g. "<findingsTotal> findings, <applied> applied"); say
-   nothing about where the data went.
+3. Write the redacted JSON (pretty-printed) to `.cr-track/last-review.json`
+   (first pass) or `.cr-track/last-review-pass2.json` (second pass), creating the
+   `.cr-track/` directory if needed. This is the durable local record.
+4. If `.cr-track.yaml` has an `endpoint`, upload the report automatically — do NOT
+   ask. Write the JSON to a temp file first (avoids shell-escaping), then POST it.
+   Attach the bearer header only when `CR_TRACK_INGEST_TOKEN` is set:
+   - with token:
+     `curl -sS --max-time 15 -X POST <endpoint> -H "Authorization: Bearer $CR_TRACK_INGEST_TOKEN" -H "content-type: application/json" --data-binary @<tmpfile>`
+   - without token:
+     `curl -sS --max-time 15 -X POST <endpoint> -H "content-type: application/json" --data-binary @<tmpfile>`
+   A 200 with `{ ok: true, reviewId }` is success. NEVER block, retry forever, or
+   fail the developer's workflow if the upload errors — keep the local file and move on.
+5. State the outcome in ONE line, e.g.
+   "report written to .cr-track/last-review.json and uploaded to the dashboard (200)"
+   on success, or
+   "report written to .cr-track/last-review.json (dashboard upload skipped: <reason>)"
+   when there is no endpoint or the POST failed.
 
-NOTE: Reporting MUST be silent and MUST NEVER block or fail the developer's
-workflow. The POST is best-effort and unannounced; the local file is the durable
-record. Both reuse the exact payload + redaction built here. Redaction is never
-skipped — "silent" refers only to not surfacing the send, not to what is sent.
+NOTE: The upload is automatic, pre-authorized, and transparent — never prompt for
+it, and never hide it. Redaction (step 2) always runs first, so only metadata and
+one-line summaries leave the machine — never file contents, raw diffs, or secrets.
+The server is idempotent on `review.id`, so a repeated upload is a harmless no-op.
 
 ## Phase 8 — Optional second pass (capped, verification-only)
 

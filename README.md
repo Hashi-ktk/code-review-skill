@@ -40,6 +40,38 @@ Pin to a tag/branch with `#`, e.g. `npx github:Hashi-ktk/code-review-skill#v0.1.
 Applied fixes are written to your files; a report lands in
 `.cr-track/last-review.json`.
 
+## Permissions (set up automatically)
+
+So a review doesn't stop to ask you again and again, the installer
+pre-authorizes the skill's **read-only and automatic** commands in your Claude
+Code settings:
+
+```
+Bash(git rev-parse:*)   Bash(git config:*)   Bash(git diff:*)
+Bash(hostname)          Bash(date:*)         Bash(echo:*)
+Bash(curl:*)            Write(.cr-track/**)
+```
+
+That covers the git lookups (preflight + diff collection) and the dashboard
+upload, so those never prompt mid-review.
+
+**Applying fixes is deliberately NOT pre-authorized.** The skill always shows you
+the findings and waits for your approval before editing any source file — only the
+fixes you pick get written.
+
+Where the rules are written:
+
+- Default (project install): `./.claude/settings.local.json` — personal and
+  auto-gitignored, so a broad `curl` grant never gets committed to the shared repo.
+- `--global`: `~/.claude/settings.json`.
+- `--shared-permissions`: `./.claude/settings.json` (committed, team-wide) instead
+  of the personal `*.local` file.
+- `--no-permissions`: skip this entirely and copy only the skill files.
+
+Existing settings are merged, never overwritten — other keys are preserved, rules
+are de-duplicated, and an unparseable settings file is left untouched (the
+installer prints the rules to add by hand instead).
+
 ### Scope overrides
 
 - `--type all` — review everything vs `HEAD` (staged + unstaged)
@@ -62,10 +94,11 @@ guidelines_files: [CLAUDE.md, CONTRIBUTING.md]
 learnings_file: .cr-track/learnings.md
 ```
 
-- When `endpoint` is set, the skill **sends the redacted report to the dashboard
-  automatically** (no prompt). It attaches `CR_TRACK_INGEST_TOKEN` as a bearer
-  token if that env var is set; otherwise it posts without one. The report is
-  always written locally to `.cr-track/last-review.json` as well.
+- When `endpoint` is set, the skill **uploads the redacted report to the dashboard
+  automatically when it runs** (no prompt, no approval step). It attaches
+  `CR_TRACK_INGEST_TOKEN` as a bearer token if that env var is set; otherwise it
+  posts without one. The report is always written locally to
+  `.cr-track/last-review.json` as well.
 - Only metadata and one-line change summaries are sent — never full file contents,
   raw diffs, or secrets (secrets are redacted before anything leaves your machine).
 
@@ -74,9 +107,13 @@ learnings_file: .cr-track/learnings.md
 ```
 npx github:Hashi-ktk/code-review-skill [options]
 
-  -g, --global   Install into ~/.claude/skills/cr-track (every repo)
-  -f, --force    Overwrite an existing install
-  -h, --help     Show help
+  -g, --global            Install into ~/.claude/skills/cr-track (every repo)
+                          and write permissions to ~/.claude/settings.json
+  -f, --force             Overwrite an existing install
+      --shared-permissions  Write permissions to .claude/settings.json (committed)
+                          instead of .claude/settings.local.json
+      --no-permissions    Copy only the skill files; don't touch any settings
+  -h, --help              Show help
 ```
 
 ## What gets installed
