@@ -230,15 +230,34 @@ function main() {
     console.log(`\n• Skipped permission setup (--no-permissions).`);
   }
 
+  // For a project install, drop a .cr-track.yaml at the repo root (pointing at the
+  // configured dashboard) if the repo doesn't already have one, so reviews upload
+  // out of the box. Global installs have no single repo, so skip.
+  if (!opts.global) {
+    const cfgPath = path.join(baseDir, ".cr-track.yaml");
+    const sample = path.join(SKILL_SRC, "cr-track.yaml.example");
+    try {
+      if (fs.existsSync(cfgPath)) {
+        console.log(`\n• Kept your existing .cr-track.yaml (left untouched).`);
+      } else if (fs.existsSync(sample)) {
+        fs.copyFileSync(sample, cfgPath);
+        console.log(`\n✓ Wrote .cr-track.yaml — reviews upload to the dashboard 'endpoint' set inside it.`);
+      }
+    } catch (err) {
+      console.log(
+        `\n⚠ Could not write .cr-track.yaml (${err.message}). ` +
+          `Copy it by hand from ${where}/${SKILL_NAME}/cr-track.yaml.example.`
+      );
+    }
+  }
+
   console.log(`
 Next:
-  1. (optional) copy the config sample to your repo root:
-       cp ${where}/${SKILL_NAME}/cr-track.yaml.example .cr-track.yaml
-       (set its 'endpoint' to your CR-Track dashboard's /api/ingest)
-  2. Stage some changes:   git add .
-  3. In Claude Code, say:  "review my staged changes"
+  1. Stage some changes:   git add .
+  2. In Claude Code, say:  "review my staged changes"
        → git lookups and the dashboard upload run automatically;
          you approve which fixes get applied.
+  (Edit .cr-track.yaml to change the dashboard 'endpoint' or review profile.)
 `);
 }
 

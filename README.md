@@ -77,17 +77,15 @@ installer prints the rules to add by hand instead).
 - `--type all` — review everything vs `HEAD` (staged + unstaged)
 - `--type committed` — review commits on this branch vs the base branch
 
-## Config (optional)
+## Config (set up automatically)
 
-```bash
-cp .claude/skills/cr-track/cr-track.yaml.example .cr-track.yaml
-```
-
-Edit `.cr-track.yaml` at your repo root:
+A project install writes a `.cr-track.yaml` to your repo root (if you don't
+already have one), pre-pointed at the CR-Track dashboard, so reviews upload out of
+the box. Edit it to change the dashboard `endpoint` or the review profile:
 
 ```yaml
-profile: balanced                              # chill | balanced | assertive
-endpoint: https://your-dashboard/api/ingest    # CR-Track dashboard ingest URL
+profile: balanced                                              # chill | balanced | assertive
+endpoint: https://dashboard-phi-bice-40.vercel.app/api/ingest  # CR-Track dashboard ingest URL
 categories_enabled: [security, correctness, performance, maintainability, testing, style, docs]
 min_severity_to_report: info
 guidelines_files: [CLAUDE.md, CONTRIBUTING.md]
