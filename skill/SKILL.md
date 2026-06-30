@@ -39,7 +39,27 @@ Global rules that apply throughout:
    - `repository.commitBefore` = `git rev-parse HEAD` (short form `git rev-parse --short HEAD`)
    - `repoRoot` = `git rev-parse --show-toplevel`
 
-3. Announce: "CR-Track preflight OK — reviewing staged changes on <branch> as <name>."
+3. Capture extended metadata (best-effort — run each command, but if one fails or
+   returns empty, simply OMIT that field; NEVER block the review on metadata). These
+   power the dashboard's per-project drill-down:
+   - Parse the remote URL (handle both `git@host:owner/repo.git` and
+     `https://host/owner/repo.git`) into `repository.host` (e.g. `github.com`),
+     `repository.owner` (e.g. `office`), `repository.repo` (slug, e.g. `billing-service`).
+   - `repository.defaultBranch` = `git symbolic-ref --short refs/remotes/origin/HEAD`
+     with any `origin/` prefix stripped; fall back to `baseBranch` if unavailable.
+   - `repository.isDirty` = `true` if `git status --porcelain` prints anything, else `false`.
+   - `review.commit` from `git log -1 --format=%H%n%h%n%s%n%an%n%ae%n%aI` (HEAD):
+     `{ sha, shortSha, message (subject line ONLY), authorName, authorEmail, authoredAt (ISO8601) }`.
+   - `review.commit.aheadOfBase` / `behindBase` from
+     `git rev-list --left-right --count <baseBranch>...HEAD` → output is
+     `<behind>\t<ahead>` (left = base-only = behind, right = HEAD-only = ahead).
+   - `project` = if `<repoRoot>/package.json` exists, read its `name`/`version`;
+     `project.primaryLanguage` = dominant file extension across the change set
+     (`.ts`→TypeScript, `.py`→Python, `.go`→Go, …), else omit `project`.
+   - `client.os` = OS platform string, `client.nodeVersion` = `node --version`
+     (omit if absent), `client.ci` = `true` if a CI env var (e.g. `CI`) is set.
+
+4. Announce: "CR-Track preflight OK — reviewing staged changes on <branch> as <name>."
    Then continue to Phase 2.
 
 ## Phase 2 — Collect the staged change set
@@ -54,10 +74,13 @@ active scope and use that exact command in every step below — do NOT fall back
 Collect (substitute the resolved `DIFF` literally in each command):
 1. File list: `<DIFF> --name-only`
 2. Per-file diffs: `<DIFF>` for the unified diff of each file.
-3. Diff stats: `<DIFF> --numstat` → sum to `diffStats`:
+3. Diff stats: `<DIFF> --numstat` (and `<DIFF> --name-status` for change types) → `diffStats`:
    - `filesChanged` = number of files listed
    - `linesAdded` = sum of column 1
    - `linesRemoved` = sum of column 2
+   - `files` = one entry per changed file: `{ path, linesAdded, linesRemoved,
+     changeType (added|modified|deleted|renamed, from --name-status A/M/D/R),
+     language (from the file extension) }`
 4. For any file where the diff lacks enough surrounding context to judge a
    finding, read the full file contents with your file tools.
 
@@ -175,7 +198,11 @@ Read `references/payload-schema.md` and `references/redaction.md`.
      `secondPass` = false (true only on a Phase 8 re-run)
    - `summary.reviewerTimeSavedMin` = sum over APPLIED findings of
      {critical:10, warning:5, info:1}
-   - `client` = { skillVersion: "1.0.0", host: the output of the `hostname` command }
+   - `client` = { skillVersion: "1.0.0", host: the output of the `hostname` command,
+     and (best-effort) `os`, `nodeVersion`, `ci` from Phase 1 }
+   - the extended metadata captured in Phases 1–2 — `repository.host/owner/repo/
+     defaultBranch/isDirty`, `review.commit`, `diffStats.files`, and `project` —
+     included verbatim where it was resolved (omit any field that wasn't)
 2. Run the redaction scan from redaction.md over every string field. Redact any
    match to `[REDACTED]`. Confirm no full file contents or raw diffs are present.
 3. Write the redacted JSON (pretty-printed) to `.cr-track/last-review.json`

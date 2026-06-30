@@ -1,7 +1,13 @@
 # CR-Track redaction (security-critical)
 
 The report MUST contain only metadata. Before writing/sending, scan EVERY string
-field you generated (titles, descriptions, suggestions, change summaries) and:
+field you generated (titles, descriptions, suggestions, change summaries) AND the
+metadata strings (`review.commit.message`, `repository.host/owner/repo`,
+`project.*`, and every `diffStats.files[].path`) and:
+
+> `review.commit.message` is the commit SUBJECT line only — never the body — and is
+> still scanned for secrets below like any other string.
+
 
 1. NEVER include: full file contents, raw diffs/hunks, or any value matching a
    secret pattern below. If a finding's natural description would quote a secret

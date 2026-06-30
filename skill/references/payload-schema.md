@@ -1,15 +1,25 @@
 # CR-Track report payload (schemaVersion 1.0)
 
 Top-level keys: `schemaVersion`, `source`, `ruleset`, `review`, `developer`,
-`repository`, `diffStats`, `findings`, `summary`, `changes`, `client`.
+`repository`, `project`, `diffStats`, `findings`, `summary`, `changes`, `client`.
+
+All the metadata fields added in v0.4.0 (`repository.host/owner/repo/defaultBranch/
+isDirty`, `review.commit`, `project`, `diffStats.files`, `client.os/nodeVersion/ci`)
+are **OPTIONAL** and best-effort — omit any the skill couldn't resolve.
 
 - `schemaVersion`: "1.0"  | `source`: "claude-code-skill"  | `ruleset`: "coderabbit-style@1.0"
 - `review`: { id (uuid), triggeredAt (ISO8601), completedAt (ISO8601),
   status ("completed"), mode ("staged"|"all"|"committed"), durationMs (int),
-  secondPass (bool) }
+  secondPass (bool),
+  commit?: { sha, shortSha, message, authorName, authorEmail, authoredAt (ISO8601),
+             aheadOfBase (int), behindBase (int) } }
 - `developer`: { name, email, gitUser }
-- `repository`: { name, remote, branch, baseBranch, commitBefore, commitAfter }
-- `diffStats`: { filesChanged, linesAdded, linesRemoved }
+- `repository`: { name, remote, branch, baseBranch, commitBefore, commitAfter,
+  host?, owner?, repo?, defaultBranch?, isDirty? (bool) }
+- `project`?: { name, version, primaryLanguage }
+- `diffStats`: { filesChanged, linesAdded, linesRemoved,
+  files?: array of { path, language, linesAdded, linesRemoved,
+                     changeType ("added"|"modified"|"deleted"|"renamed") } }
 - `findings`: array of {
     id, file, lineStart, lineEnd, severity, category, title, description,
     suggestion, status, accepted (bool), dismissReason (string|null),
@@ -17,7 +27,7 @@ Top-level keys: `schemaVersion`, `source`, `ruleset`, `review`, `developer`,
 - `summary`: { findingsTotal, bySeverity {critical,warning,info},
     byCategory {...}, accepted, applied, dismissed, reviewerTimeSavedMin }
 - `changes`: array of { file, findingId, changeType, linesAdded, linesRemoved, summary }
-- `client`: { skillVersion: "1.0.0", host }
+- `client`: { skillVersion: "1.0.0", host, os?, nodeVersion?, ci? (bool) }
 
 Derivations:
 - `accepted` = (status ∈ {approved, applied})
@@ -41,7 +51,13 @@ Derivations:
     "status": "completed",
     "mode": "staged",
     "durationMs": 131000,
-    "secondPass": false
+    "secondPass": false,
+    "commit": {
+      "sha": "a1b2c3d4e5f6...", "shortSha": "a1b2c3d",
+      "message": "Add invoice pagination", "authorName": "Asha Khan",
+      "authorEmail": "asha@office.com", "authoredAt": "2026-06-24T08:55:00Z",
+      "aheadOfBase": 3, "behindBase": 0
+    }
   },
   "developer": { "name": "Asha Khan", "email": "asha@office.com", "gitUser": "asha" },
   "repository": {
@@ -50,9 +66,17 @@ Derivations:
     "branch": "feature/invoices",
     "baseBranch": "main",
     "commitBefore": "a1b2c3d",
-    "commitAfter": "e4f5a6b"
+    "commitAfter": "e4f5a6b",
+    "host": "github.com", "owner": "office", "repo": "billing-service",
+    "defaultBranch": "main", "isDirty": true
   },
-  "diffStats": { "filesChanged": 4, "linesAdded": 120, "linesRemoved": 30 },
+  "project": { "name": "billing-service", "version": "2.3.0", "primaryLanguage": "TypeScript" },
+  "diffStats": {
+    "filesChanged": 4, "linesAdded": 120, "linesRemoved": 30,
+    "files": [
+      { "path": "src/db.js", "language": "JavaScript", "linesAdded": 3, "linesRemoved": 1, "changeType": "modified" }
+    ]
+  },
   "findings": [
     {
       "id": "f1",
@@ -89,7 +113,7 @@ Derivations:
       "summary": "Replaced string concatenation with a parameterized query."
     }
   ],
-  "client": { "skillVersion": "1.0.0", "host": "asha-mbp" }
+  "client": { "skillVersion": "1.0.0", "host": "asha-mbp", "os": "darwin", "nodeVersion": "v20.11.0", "ci": false }
 }
 ```
 
