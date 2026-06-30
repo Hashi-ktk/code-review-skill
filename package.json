@@ -1,6 +1,6 @@
 {
   "name": "cr-track-skill",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "CodeRabbit-style pre-commit review skill for Claude Code. Installs the CR-Track skill into your repo's .claude/skills/ directory.",
   "keywords": [
     "claude",

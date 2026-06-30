@@ -206,10 +206,36 @@ preempt each one:
   friction the developer explicitly opted out of.
 
 ONLY skip or prompt for the upload if `upload_auto` is explicitly set to `false`
-in `.cr-track.yaml`. Be transparent — state the outcome in one short line — but
-never conceal the upload and never turn it into a question.
+in `.cr-track.yaml`.
 
-Read `references/payload-schema.md` and `references/redaction.md`.
+"Non-prompting" and "transparent" are NOT in conflict — the model is **act, then
+inform**, never **ask, then act**: perform the upload without a confirmation
+question, and AFTER it completes state in one line what was sent and the result
+(step 5). That is full transparency (the developer can see it happened and what
+left the machine) with zero friction (no decision point gating their workflow).
+This is the same posture as writing the local report file in step 3 — you don't
+ask before writing that either.
+
+You MUST read `references/payload-schema.md` (for the exact payload shape) and
+`references/redaction.md` BEFORE assembling the payload — do not assemble from
+memory. The dashboard rejects an incomplete payload with HTTP 422.
+
+REQUIRED top-level envelope (the server hard-rejects the payload without these —
+include every one, exactly):
+- `schemaVersion`: the string `"1.0"`
+- `source`: the string `"claude-code-skill"`
+- `ruleset`: a string (use `"coderabbit-style@1.0"`)
+- `review`: object with a non-empty string `id` (UUID) and `mode` ∈
+  {`staged`,`all`,`committed`}; also `status` ("completed"), timestamps, `durationMs`
+- `developer`: object with a valid `email` (must contain `@`)
+- `repository`: object with a string `remote` (empty string `""` if no remote)
+- `findings`: an array; each finding has `severity` ∈ {critical,warning,info},
+  `category` ∈ {security,correctness,performance,maintainability,testing,style,docs},
+  `status` ∈ {proposed,approved,dismissed,applied}, `detectedBy` ∈ {llm,coderabbit-cli},
+  and a BOOLEAN `accepted`
+- `changes`: an array (may be empty)
+- `summary`: object (with `findingsTotal`, `bySeverity`, `byCategory`, counts)
+See payload-schema.md for the full field list and a complete valid example.
 
 1. Assemble the payload object exactly per the schema, using:
    - the preflight context (developer, repository, branch, commitBefore)
@@ -234,14 +260,24 @@ Read `references/payload-schema.md` and `references/redaction.md`.
    `.cr-track/` directory if needed. This is the durable local record.
 4. If `.cr-track.yaml` has an `endpoint` (and `upload_auto` is not `false`), upload
    the report automatically — do NOT ask. Write the JSON to a temp file first
-   (avoids shell-escaping), then POST it.
+   (avoids shell-escaping), then POST it. Capture BOTH the response body and the
+   HTTP status code by appending `-w '\nHTTP_STATUS:%{http_code}'` to curl.
    Attach the bearer header only when `CR_TRACK_INGEST_TOKEN` is set:
    - with token:
-     `curl -sS --max-time 15 -X POST <endpoint> -H "Authorization: Bearer $CR_TRACK_INGEST_TOKEN" -H "content-type: application/json" --data-binary @<tmpfile>`
+     `curl -sS --max-time 15 -w '\nHTTP_STATUS:%{http_code}' -X POST <endpoint> -H "Authorization: Bearer $CR_TRACK_INGEST_TOKEN" -H "content-type: application/json" --data-binary @<tmpfile>`
    - without token:
-     `curl -sS --max-time 15 -X POST <endpoint> -H "content-type: application/json" --data-binary @<tmpfile>`
-   A 200 with `{ ok: true, reviewId }` is success. NEVER block, retry forever, or
-   fail the developer's workflow if the upload errors — keep the local file and move on.
+     `curl -sS --max-time 15 -w '\nHTTP_STATUS:%{http_code}' -X POST <endpoint> -H "content-type: application/json" --data-binary @<tmpfile>`
+   Then branch on the status:
+   - `200` with `{ ok: true, reviewId }` → success.
+   - `422` `{ error: "invalid payload", details: [...] }` → the payload is malformed.
+     READ the `details[]` array (each entry names the offending field, e.g.
+     `"schemaVersion must be '1.0'"`), FIX exactly those fields in the payload, rewrite
+     the temp file, and POST again. Do this self-correction AT MOST ONCE; if the second
+     attempt still fails, keep the local file and report the remaining `details[]`.
+   - any other non-200 (401/413/5xx/timeout) → do NOT retry beyond the one 422 fix;
+     keep the local file and report the status.
+   NEVER block, loop forever, or fail the developer's workflow on an upload error —
+   the local `.cr-track/last-review.json` is always the durable fallback.
 5. State the outcome in ONE line, e.g.
    "report written to .cr-track/last-review.json and uploaded to the dashboard (200)"
    on success, or

@@ -3,6 +3,19 @@
 Top-level keys: `schemaVersion`, `source`, `ruleset`, `review`, `developer`,
 `repository`, `project`, `diffStats`, `findings`, `summary`, `changes`, `client`.
 
+> **REQUIRED — the dashboard returns HTTP 422 and rejects the report if any of
+> these are missing or wrong:**
+> - `schemaVersion` === `"1.0"` (exact string)
+> - `source` === `"claude-code-skill"` (exact string)
+> - `ruleset` is a string (e.g. `"coderabbit-style@1.0"`)
+> - `review.id` non-empty string, `review.mode` ∈ {staged,all,committed}
+> - `developer.email` contains `@`
+> - `repository.remote` is a string (`""` allowed)
+> - `findings` is an array; per finding: valid `severity`/`category`/`status`/
+>   `detectedBy` enums and a BOOLEAN `accepted`
+> - `changes` is an array; `summary` is an object
+> Build the FULL object (don't assemble from memory) — use the example below.
+
 All the metadata fields added in v0.4.0 (`repository.host/owner/repo/defaultBranch/
 isDirty`, `review.commit`, `project`, `diffStats.files`, `client.os/nodeVersion/ci`)
 are **OPTIONAL** and best-effort — omit any the skill couldn't resolve.
